@@ -2,11 +2,15 @@ name: PKU SoftMicro Admission Monitor
 
 on:
   schedule:
-    # 每 10 分钟运行一次
     - cron: "*/10 * * * *"
 
-  # 允许你在 GitHub 页面手动运行
   workflow_dispatch:
+    inputs:
+      test_email:
+        description: "Send a test email"
+        required: true
+        default: "false"
+        type: boolean
 
 jobs:
 
@@ -19,35 +23,87 @@ jobs:
 
     steps:
 
-      # ------------------------------------------------------
-      # 下载仓库
-      # ------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # ------------------------------------------------------
-      # 安装 Python
-      # ------------------------------------------------------
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ------------------------------------------------------
-      # 安装依赖
-      # ------------------------------------------------------
-
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      # ------------------------------------------------------
-      # 运行监控程序
-      # ------------------------------------------------------
+      # ======================================================
+      # 测试邮件
+      # ======================================================
+
+      - name: Send test email
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_email == true }}
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_RECEIVER: ${{ secrets.MAIL_RECEIVER }}
+        run: |
+
+          python - <<'PY'
+          import os
+          import smtplib
+          from email.mime.text import MIMEText
+          from email.header import Header
+
+          sender = os.environ["MAIL_USERNAME"]
+          password = os.environ["MAIL_PASSWORD"]
+          receiver = os.environ["MAIL_RECEIVER"]
+
+          subject = "【测试】北大软微招生通知监控"
+
+          body = """这是一封测试邮件。
+
+如果你能看到这封邮件，说明：
+
+GitHub Actions
+→ QQ邮箱 SMTP
+→ 接收邮箱
+→ 手机
+
+整个通知链路已经打通。
+
+正式监控程序没有被修改。
+
+测试时间：
+2026-08-29
+"""
+
+          msg = MIMEText(body, "plain", "utf-8")
+          msg["Subject"] = Header(subject, "utf-8")
+          msg["From"] = sender
+          msg["To"] = receiver
+
+          with smtplib.SMTP_SSL(
+              "smtp.qq.com",
+              465,
+              timeout=30
+          ) as server:
+
+              server.login(sender, password)
+
+              server.sendmail(
+                  sender,
+                  receiver,
+                  msg.as_string()
+              )
+
+          print("测试邮件发送成功！")
+          PY
+
+      # ======================================================
+      # 正常监控
+      # ======================================================
 
       - name: Check PKU admission notices
+        if: ${{ github.event_name == 'schedule' || inputs.test_email == false }}
         env:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
@@ -55,11 +111,12 @@ jobs:
         run: |
           python monitor.py
 
-      # ------------------------------------------------------
-      # 保存 state.json
-      # ------------------------------------------------------
+      # ======================================================
+      # 保存正常监控状态
+      # ======================================================
 
       - name: Save monitoring state
+        if: ${{ github.event_name == 'schedule' || inputs.test_email == false }}
         run: |
 
           git config --global user.name "PKU Admission Monitor"
