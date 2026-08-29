@@ -5,12 +5,6 @@ on:
     - cron: "*/10 * * * *"
 
   workflow_dispatch:
-    inputs:
-      test_email:
-        description: "Send a test email"
-        required: true
-        default: false
-        type: boolean
 
 jobs:
   monitor:
@@ -29,79 +23,19 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Send test email
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_email == true }}
-        env:
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-          MAIL_RECEIVER: ${{ secrets.MAIL_RECEIVER }}
-        run: |
-          python - <<'PY'
-          import os
-          import smtplib
-          from email.mime.text import MIMEText
-          from email.header import Header
-
-          sender = os.environ["MAIL_USERNAME"]
-          password = os.environ["MAIL_PASSWORD"]
-          receiver = os.environ["MAIL_RECEIVER"]
-
-          subject = "【测试】北大软微招生通知监控"
-
-          body = """这是一封测试邮件。
-
-如果你能看到这封邮件，说明：
-
-GitHub Actions
-→ QQ邮箱 SMTP
-→ 接收邮箱
-→ 手机
-
-整个通知链路已经打通。
-
-正式监控程序没有被修改。
-"""
-
-          msg = MIMEText(body, "plain", "utf-8")
-          msg["Subject"] = Header(subject, "utf-8")
-          msg["From"] = sender
-          msg["To"] = receiver
-
-          with smtplib.SMTP_SSL(
-              "smtp.qq.com",
-              465,
-              timeout=30
-          ) as server:
-              server.login(sender, password)
-              server.sendmail(
-                  sender,
-                  receiver,
-                  msg.as_string()
-              )
-
-          print("测试邮件发送成功！")
-          PY
+        run: pip install -r requirements.txt
 
       - name: Check PKU admission notices
-        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_email == false) }}
         env:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_RECEIVER: ${{ secrets.MAIL_RECEIVER }}
-        run: |
-          python monitor.py
+        run: python monitor.py
 
       - name: Save monitoring state
-        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_email == false) }}
         run: |
           git config --global user.name "PKU Admission Monitor"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
           git add state.json
-
           git diff --cached --quiet || git commit -m "Update monitoring state"
-
           git push
