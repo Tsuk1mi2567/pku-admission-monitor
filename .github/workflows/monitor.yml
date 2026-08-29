@@ -9,20 +9,17 @@ on:
       test_email:
         description: "Send a test email"
         required: true
-        default: "false"
+        default: false
         type: boolean
 
 jobs:
-
   monitor:
-
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -35,10 +32,6 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      # ======================================================
-      # 测试邮件
-      # ======================================================
-
       - name: Send test email
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_email == true }}
         env:
@@ -46,7 +39,6 @@ jobs:
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_RECEIVER: ${{ secrets.MAIL_RECEIVER }}
         run: |
-
           python - <<'PY'
           import os
           import smtplib
@@ -71,9 +63,6 @@ GitHub Actions
 整个通知链路已经打通。
 
 正式监控程序没有被修改。
-
-测试时间：
-2026-08-29
 """
 
           msg = MIMEText(body, "plain", "utf-8")
@@ -86,9 +75,7 @@ GitHub Actions
               465,
               timeout=30
           ) as server:
-
               server.login(sender, password)
-
               server.sendmail(
                   sender,
                   receiver,
@@ -98,12 +85,8 @@ GitHub Actions
           print("测试邮件发送成功！")
           PY
 
-      # ======================================================
-      # 正常监控
-      # ======================================================
-
       - name: Check PKU admission notices
-        if: ${{ github.event_name == 'schedule' || inputs.test_email == false }}
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_email == false) }}
         env:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
@@ -111,14 +94,9 @@ GitHub Actions
         run: |
           python monitor.py
 
-      # ======================================================
-      # 保存正常监控状态
-      # ======================================================
-
       - name: Save monitoring state
-        if: ${{ github.event_name == 'schedule' || inputs.test_email == false }}
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_email == false) }}
         run: |
-
           git config --global user.name "PKU Admission Monitor"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
