@@ -8,52 +8,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send test email
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run email test
         env:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
           MAIL_RECEIVER: ${{ secrets.MAIL_RECEIVER }}
-        run: |
-          python - <<'PY'
-          import os
-          import smtplib
-          from email.mime.text import MIMEText
-          from email.header import Header
-
-          sender = os.environ["MAIL_USERNAME"]
-          password = os.environ["MAIL_PASSWORD"]
-          receiver = os.environ["MAIL_RECEIVER"]
-
-          msg = MIMEText(
-              """这是一封测试邮件。
-
-GitHub Actions → QQ邮箱 SMTP → 手机
-
-如果你收到这封邮件，说明邮箱通知功能配置成功。
-""",
-              "plain",
-              "utf-8"
-          )
-
-          msg["Subject"] = Header(
-              "【测试】北大软微招生通知监控",
-              "utf-8"
-          )
-
-          msg["From"] = sender
-          msg["To"] = receiver
-
-          with smtplib.SMTP_SSL(
-              "smtp.qq.com",
-              465,
-              timeout=30
-          ) as server:
-              server.login(sender, password)
-              server.sendmail(
-                  sender,
-                  receiver,
-                  msg.as_string()
-              )
-
-          print("测试邮件发送成功！")
-          PY
+        run: python test_email.py
